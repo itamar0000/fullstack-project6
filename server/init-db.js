@@ -1,15 +1,16 @@
 import mysql from "mysql2/promise";
+import { dbConfig } from "./config.js";
+
+// Connect without selecting a database so we can create it if missing.
+const { database, ...serverConfig } = dbConfig;
 
 const ROOT = await mysql.createConnection({
-  host: "127.0.0.1",
-  port: 3306,
-  user: "root",
-  password: "",
+  ...serverConfig,
   multipleStatements: true,
 });
 
-await ROOT.execute("CREATE DATABASE IF NOT EXISTS proj6 CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
-await ROOT.query("USE proj6");
+await ROOT.execute(`CREATE DATABASE IF NOT EXISTS \`${database}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`);
+await ROOT.query(`USE \`${database}\``);
 
 await ROOT.execute(`
   CREATE TABLE IF NOT EXISTS users (

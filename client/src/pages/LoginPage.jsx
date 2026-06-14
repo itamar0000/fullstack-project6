@@ -40,9 +40,9 @@ function LoginPage() {
     <main className="auth-page">
       <section className="auth-panel">
         <div className="auth-copy">
-          <p className="eyebrow">Project5</p>
+          <p className="eyebrow">Project 6</p>
           <h1>Sign in</h1>
-          <p>Use a JSON Server username and the matching website field as the password.</p>
+          <p>Enter your username and password to access the app.</p>
         </div>
 
         <form className="form-stack" onSubmit={handleSubmit(onSubmit)}>

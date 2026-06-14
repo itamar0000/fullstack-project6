@@ -71,7 +71,7 @@ function RegisterPage() {
     <main className="auth-page">
       <section className="auth-panel wide">
         <div className="auth-copy">
-          <p className="eyebrow">Project5</p>
+          <p className="eyebrow">Project 6</p>
           <h1>Register</h1>
           <p>{credentials ? "Complete the mandatory profile details." : "Choose unique credentials."}</p>
         </div>

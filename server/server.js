@@ -1,5 +1,6 @@
 import express from "express";
 import cors from "cors";
+import { PORT } from "./config.js";
 import usersRouter    from "./routes/users.js";
 import todosRouter    from "./routes/todos.js";
 import postsRouter    from "./routes/posts.js";
@@ -7,11 +8,11 @@ import commentsRouter from "./routes/comments.js";
 import albumsRouter   from "./routes/albums.js";
 import photosRouter   from "./routes/photos.js";
 
-const app  = express();
-const PORT = process.env.PORT || 3001;
+const app = express();
 
 app.use(cors());
 app.use(express.json());
+app.use((req, _res, next) => { console.log(`${req.method} ${req.url}`); next(); });
 
 app.use("/users",    usersRouter);
 app.use("/todos",    todosRouter);

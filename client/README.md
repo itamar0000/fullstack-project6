@@ -1,54 +1,35 @@
-# Project5 Advanced React REST App
+# Project 6 — React Client
 
-React application for the JavaScript and React learning scope: auth, forms, routing, effects, data fetching, CRUD, client caching, and JSON Server data.
+React + Vite front-end for Project 6. It talks to the Express + MySQL server
+in [`../server`](../server) over a REST API.
 
 ## Run
 
 ```bash
 npm install
-npm run server
 npm run dev
 ```
 
-Open the Vite URL printed by `npm run dev`. The API defaults to `http://localhost:3001`.
-
-## Demo Users
-
-The password is the user's `website` value, per the project requirements.
-
-- Username: `Bret`, password: `hildegard.org`
-- Username: `Antonette`, password: `anastasia.net`
-- Username: `Samantha`, password: `ramiro.info`
+Opens on `http://localhost:5173` and calls the API at `http://localhost:3001`
+(override with `VITE_API_BASE_URL`). **Start the server first** — see the
+[top-level README](../README.md) for full setup, demo users, and API docs.
 
 ## Features
 
-- Login and registration with React Hook Form.
-- Auth state persisted in Local Storage.
-- Guarded routes and ownership checks for `/users/:userId/...`.
-- Todos CRUD with search, sort, inline title editing, and completion toggles.
-- Posts CRUD with selected detailed view and comments CRUD limited to the current user's comments.
-- Albums CRUD and paged photo loading with add, update, and delete.
-- Fetch-based API client with GET caching, plus Axios for paged photo requests.
+- Login / registration with React Hook Form; session persisted in Local Storage.
+- Guarded routes and ownership checks for `/users/:userId/...` URLs.
+- **Info** modal (profile without password) and **Logout** in the header.
+- Todos CRUD with search, sort, inline editing, and completion toggles.
+- Posts CRUD with a detail view and comments CRUD (limited to the current user).
+- Albums CRUD with paged photo loading (add / update / delete).
 
-## Responsibility Separation
+## Structure
 
-- `src/App.jsx` wires global providers only.
-- `src/routes/AppRouter.jsx` owns the route tree.
-- `src/routes/paths.js` owns all route strings and URL builders.
-- `src/routes/AuthenticatedRoute.jsx` protects logged-in pages.
-- `src/routes/CurrentUserRoute.jsx` prevents access to another user's URL data.
-- `src/layouts/AppLayout.jsx` owns the header, navigation, logout, and shared page frame.
-- `src/pages/` owns page-level screens.
-- `src/features/` owns feature-specific hooks, view helpers, and feature UI.
-- `src/api/` owns server communication and client caching.
-- `src/context/` owns global React state such as authentication.
-- `src/components/` owns reusable UI pieces that are not routes or pages.
-
-## State And Function Leveling
-
-- Pages compose feature pieces and only keep orchestration that crosses concerns, such as selecting a new post after creating it.
-- Server/resource state lives in feature hooks such as `useTodos`, `usePosts`, `usePostComments`, `useAlbums`, and `useAlbumPhotos`.
-- Search, sort, and derived list state lives in feature filter hooks.
-- Temporary form state lives in the form component that uses it.
-- Temporary edit state lives in the row/card/detail component being edited.
-- API functions stay in `src/api`; ownership/security checks stay in the feature hooks before mutations run.
+- `src/App.jsx` — wires global providers.
+- `src/routes/` — route tree, path builders, and route guards.
+- `src/layouts/AppLayout.jsx` — header, navigation, Info, Logout.
+- `src/pages/` — page-level screens.
+- `src/features/` — feature hooks, view helpers, and UI per resource.
+- `src/api/` — server communication and client-side GET caching.
+- `src/context/` — authentication state.
+- `src/components/` — reusable UI pieces.
