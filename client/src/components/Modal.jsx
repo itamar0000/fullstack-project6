@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from "react";
+import { IconX } from "./icons.jsx";
 
 function Modal({ title, children, onClose }) {
   const closeButtonRef = useRef(null);
@@ -28,6 +29,7 @@ function Modal({ title, children, onClose }) {
         <header className="modal-header">
           <h2 id="modal-title">{title}</h2>
           <button ref={closeButtonRef} type="button" className="ghost-button" onClick={onClose}>
+            <IconX className="icon" />
             Close
           </button>
         </header>

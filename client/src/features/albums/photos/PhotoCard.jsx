@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { IconCheck, IconPencil, IconTrash, IconX } from "../../../components/icons.jsx";
 
 function PhotoCard({ photo, onDelete, onUpdate }) {
   const [draft, setDraft] = useState(null);
@@ -40,9 +41,11 @@ function PhotoCard({ photo, onDelete, onUpdate }) {
           </label>
           <div className="row-actions">
             <button type="submit" className="primary-button small">
+              <IconCheck className="icon" />
               Save
             </button>
             <button type="button" className="ghost-button small" onClick={() => setDraft(null)}>
+              <IconX className="icon" />
               Cancel
             </button>
           </div>
@@ -52,9 +55,11 @@ function PhotoCard({ photo, onDelete, onUpdate }) {
           <h4>{photo.title}</h4>
           <div className="row-actions">
             <button type="button" className="ghost-button small" onClick={() => setDraft(photo)}>
+              <IconPencil className="icon" />
               Edit
             </button>
             <button type="button" className="danger-button small" onClick={() => onDelete(photo)}>
+              <IconTrash className="icon" />
               Delete
             </button>
           </div>

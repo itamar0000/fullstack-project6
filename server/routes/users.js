@@ -1,52 +1,20 @@
 import { Router } from "express";
+import bcrypt from "bcryptjs";
 import pool from "../db.js";
+import { requireAuth } from "../middleware/auth.js";
+import { rowToUser } from "../userMapper.js";
 
 const router = Router();
 
-function rowToUser(r) {
-  return {
-    id: r.id,
-    name: r.name,
-    username: r.username,
-    email: r.email,
-    phone: r.phone,
-    website: r.website,
-    address: {
-      street: r.street,
-      suite: r.suite,
-      city: r.city,
-      zipcode: r.zipcode,
-    },
-    company: {
-      name: r.company_name,
-      catchPhrase: r.company_catchphrase,
-      bs: r.company_bs,
-    },
-  };
-}
-
-// GET /users or /users?username=x or /users?username=x&website=pw
+// GET /users or /users?username=x  (no password involved — public profile lookup only)
 router.get("/", async (req, res) => {
-  const { username, website } = req.query;
+  const { username } = req.query;
 
   let sql = "SELECT * FROM users";
   const params = [];
-
   if (username) {
     sql += " WHERE username = ?";
     params.push(username);
-    // if website (password) provided, verify against user_passwords
-    if (website) {
-      const [rows] = await pool.execute(sql, params);
-      if (!rows.length) return res.json([]);
-      const user = rows[0];
-      const [[pwd]] = await pool.execute(
-        "SELECT password FROM user_passwords WHERE user_id = ?",
-        [user.id]
-      );
-      if (!pwd || pwd.password !== website) return res.json([]);
-      return res.json([rowToUser(user)]);
-    }
   }
 
   const [rows] = await pool.execute(sql, params);
@@ -62,7 +30,11 @@ router.get("/:id", async (req, res) => {
 
 // POST /users  (register)
 router.post("/", async (req, res) => {
-  const { name, username, email, phone, website, address = {}, company = {} } = req.body;
+  const { name, username, email, phone, password, website = "", address = {}, company = {} } = req.body;
+
+  if (!username || !password) {
+    return res.status(400).json({ message: "Username and password are required" });
+  }
 
   const [existing] = await pool.execute("SELECT id FROM users WHERE username = ?", [username]);
   if (existing.length) return res.status(409).json({ message: "Username already taken" });
@@ -78,22 +50,27 @@ router.post("/", async (req, res) => {
   );
 
   const newId = result.insertId;
+  const hash = await bcrypt.hash(password, 10);
   await pool.execute(
     "INSERT INTO user_passwords (user_id, password) VALUES (?,?)",
-    [newId, website || ""]
+    [newId, hash]
   );
 
   const [[newUser]] = await pool.execute("SELECT * FROM users WHERE id = ?", [newId]);
   res.status(201).json(rowToUser(newUser));
 });
 
-// PUT/PATCH /users/:id
-router.put("/:id", handleUpdate);
-router.patch("/:id", handleUpdate);
+// PUT/PATCH /users/:id  (only the authenticated user may edit their own profile)
+router.put("/:id", requireAuth, handleUpdate);
+router.patch("/:id", requireAuth, handleUpdate);
 
 async function handleUpdate(req, res) {
-  const { name, username, email, phone, website, address = {}, company = {} } = req.body;
   const id = req.params.id;
+  if (Number(id) !== req.userId) {
+    return res.status(403).json({ message: "You can only edit your own profile" });
+  }
+
+  const { name, username, email, phone, website, address = {}, company = {} } = req.body;
 
   const [[existing]] = await pool.execute("SELECT * FROM users WHERE id = ?", [id]);
   if (!existing) return res.status(404).json({ message: "User not found" });
@@ -119,19 +96,15 @@ async function handleUpdate(req, res) {
     [...Object.values(merged), id]
   );
 
-  if (website !== undefined) {
-    await pool.execute(
-      "INSERT INTO user_passwords (user_id,password) VALUES (?,?) ON DUPLICATE KEY UPDATE password=?",
-      [id, website, website]
-    );
-  }
-
   const [[updated]] = await pool.execute("SELECT * FROM users WHERE id = ?", [id]);
   res.json(rowToUser(updated));
 }
 
-// DELETE /users/:id
-router.delete("/:id", async (req, res) => {
+// DELETE /users/:id  (only the authenticated user may delete their own account)
+router.delete("/:id", requireAuth, async (req, res) => {
+  if (Number(req.params.id) !== req.userId) {
+    return res.status(403).json({ message: "You can only delete your own account" });
+  }
   await pool.execute("DELETE FROM users WHERE id = ?", [req.params.id]);
   res.json({});
 });

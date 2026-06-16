@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useMemo, useState } from "react";
-import { usersApi } from "../api/resources.js";
+import { authApi, usersApi } from "../api/resources.js";
+import { setAuthToken } from "../api/client.js";
 
 const AuthContext = createContext(null);
 const AUTH_STORAGE_KEY = "project5.currentUser";
@@ -25,9 +26,9 @@ export function AuthProvider({ children }) {
 
   async function login(username, password) {
     const cleanUsername = username.trim();
-    const user = await usersApi.getByUsername(cleanUsername, password);
+    const { token, user } = await authApi.login(cleanUsername, password);
 
-
+    setAuthToken(token);
     setCurrentUser(user);
     persistUser(user);
     return user;
@@ -41,12 +42,12 @@ export function AuthProvider({ children }) {
       throw new Error("This username is already taken.");
     }
 
-    const savedUser = await usersApi.create({
+    await usersApi.create({
       name: profile.name.trim(),
       username: cleanUsername,
+      password: credentials.password,
       email: profile.email.trim(),
       phone: profile.phone.trim(),
-      website: credentials.password,
       address: {
         street: profile.street.trim(),
         suite: profile.suite.trim(),
@@ -60,12 +61,11 @@ export function AuthProvider({ children }) {
       }
     });
 
-    setCurrentUser(savedUser);
-    persistUser(savedUser);
-    return savedUser;
+    return login(cleanUsername, credentials.password);
   }
 
   function logout() {
+    setAuthToken(null);
     setCurrentUser(null);
     persistUser(null);
   }

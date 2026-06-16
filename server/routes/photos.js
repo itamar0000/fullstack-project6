@@ -1,7 +1,13 @@
 import { Router } from "express";
 import pool from "../db.js";
+import { requireAuth } from "../middleware/auth.js";
 
 const router = Router();
+
+async function getOwningAlbum(albumId) {
+  const [[album]] = await pool.execute("SELECT * FROM albums WHERE id = ?", [albumId]);
+  return album || null;
+}
 
 // GET /photos?albumId=X&_page=N&_limit=M
 // Returns X-Total-Count header for pagination (matches json-server / axios client behaviour)
@@ -45,9 +51,16 @@ router.get("/:id", async (req, res) => {
   res.json(row);
 });
 
-// POST /photos
-router.post("/", async (req, res) => {
+// POST /photos  (only into an album owned by the authenticated user)
+router.post("/", requireAuth, async (req, res) => {
   const { albumId, title, url, thumbnailUrl } = req.body;
+
+  const album = await getOwningAlbum(albumId);
+  if (!album) return res.status(404).json({ message: "Album not found" });
+  if (album.userId !== req.userId) {
+    return res.status(403).json({ message: "You can only add photos to your own albums" });
+  }
+
   const [result] = await pool.execute(
     "INSERT INTO photos (albumId, title, url, thumbnailUrl) VALUES (?,?,?,?)",
     [albumId, title, url, thumbnailUrl]
@@ -56,13 +69,18 @@ router.post("/", async (req, res) => {
   res.status(201).json(row);
 });
 
-// PUT/PATCH /photos/:id
-router.put("/:id", handleUpdate);
-router.patch("/:id", handleUpdate);
+// PUT/PATCH /photos/:id  (only if the photo's album belongs to the authenticated user)
+router.put("/:id", requireAuth, handleUpdate);
+router.patch("/:id", requireAuth, handleUpdate);
 
 async function handleUpdate(req, res) {
   const [[existing]] = await pool.execute("SELECT * FROM photos WHERE id = ?", [req.params.id]);
   if (!existing) return res.status(404).json({ message: "Not found" });
+
+  const album = await getOwningAlbum(existing.albumId);
+  if (!album || album.userId !== req.userId) {
+    return res.status(403).json({ message: "You can only update photos in your own albums" });
+  }
 
   const title        = req.body.title        ?? existing.title;
   const url          = req.body.url          ?? existing.url;
@@ -76,8 +94,16 @@ async function handleUpdate(req, res) {
   res.json(row);
 }
 
-// DELETE /photos/:id
-router.delete("/:id", async (req, res) => {
+// DELETE /photos/:id  (only if the photo's album belongs to the authenticated user)
+router.delete("/:id", requireAuth, async (req, res) => {
+  const [[existing]] = await pool.execute("SELECT * FROM photos WHERE id = ?", [req.params.id]);
+  if (!existing) return res.status(404).json({ message: "Not found" });
+
+  const album = await getOwningAlbum(existing.albumId);
+  if (!album || album.userId !== req.userId) {
+    return res.status(403).json({ message: "You can only delete photos in your own albums" });
+  }
+
   await pool.execute("DELETE FROM photos WHERE id = ?", [req.params.id]);
   res.json({});
 });

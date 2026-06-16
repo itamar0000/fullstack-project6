@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { IconPlus } from "../../../components/icons.jsx";
 
 function CommentCreateForm({ onCreate }) {
   const [body, setBody] = useState("");
@@ -28,6 +29,7 @@ function CommentCreateForm({ onCreate }) {
         <input value={body} onChange={(event) => setBody(event.target.value)} placeholder="Add a comment" />
       </label>
       <button type="submit" className="primary-button" disabled={submitting}>
+        <IconPlus className="icon" />
         Add
       </button>
     </form>

@@ -1,5 +1,6 @@
 import { Router } from "express";
 import pool from "../db.js";
+import { requireAuth } from "../middleware/auth.js";
 
 const router = Router();
 
@@ -21,24 +22,27 @@ router.get("/:id", async (req, res) => {
   res.json(row);
 });
 
-// POST /comments
-router.post("/", async (req, res) => {
+// POST /comments  (always attributed to the authenticated user)
+router.post("/", requireAuth, async (req, res) => {
   const { postId, name, email, body } = req.body;
   const [result] = await pool.execute(
-    "INSERT INTO comments (postId, name, email, body) VALUES (?,?,?,?)",
-    [postId, name, email, body]
+    "INSERT INTO comments (postId, userId, name, email, body) VALUES (?,?,?,?,?)",
+    [postId, req.userId, name, email, body]
   );
   const [[row]] = await pool.execute("SELECT * FROM comments WHERE id = ?", [result.insertId]);
   res.status(201).json(row);
 });
 
-// PUT/PATCH /comments/:id
-router.put("/:id", handleUpdate);
-router.patch("/:id", handleUpdate);
+// PUT/PATCH /comments/:id  (only the owning user may update)
+router.put("/:id", requireAuth, handleUpdate);
+router.patch("/:id", requireAuth, handleUpdate);
 
 async function handleUpdate(req, res) {
   const [[existing]] = await pool.execute("SELECT * FROM comments WHERE id = ?", [req.params.id]);
   if (!existing) return res.status(404).json({ message: "Not found" });
+  if (existing.userId !== req.userId) {
+    return res.status(403).json({ message: "You can only update your own comments" });
+  }
 
   const name  = req.body.name  ?? existing.name;
   const email = req.body.email ?? existing.email;
@@ -52,8 +56,13 @@ async function handleUpdate(req, res) {
   res.json(row);
 }
 
-// DELETE /comments/:id
-router.delete("/:id", async (req, res) => {
+// DELETE /comments/:id  (only the owning user may delete)
+router.delete("/:id", requireAuth, async (req, res) => {
+  const [[existing]] = await pool.execute("SELECT * FROM comments WHERE id = ?", [req.params.id]);
+  if (!existing) return res.status(404).json({ message: "Not found" });
+  if (existing.userId !== req.userId) {
+    return res.status(403).json({ message: "You can only delete your own comments" });
+  }
   await pool.execute("DELETE FROM comments WHERE id = ?", [req.params.id]);
   res.json({});
 });

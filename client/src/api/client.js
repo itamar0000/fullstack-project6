@@ -4,6 +4,25 @@ export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localho
 
 const MEMORY_CACHE = new Map();
 const CACHE_STORAGE_KEY = "project5.apiCache";
+const TOKEN_STORAGE_KEY = "project6.authToken";
+
+export function getAuthToken() {
+  if (typeof window === "undefined") {
+    return null;
+  }
+  return window.localStorage.getItem(TOKEN_STORAGE_KEY);
+}
+
+export function setAuthToken(token) {
+  if (typeof window === "undefined") {
+    return;
+  }
+  if (token) {
+    window.localStorage.setItem(TOKEN_STORAGE_KEY, token);
+  } else {
+    window.localStorage.removeItem(TOKEN_STORAGE_KEY);
+  }
+}
 
 export class ApiError extends Error {
   constructor(message, status, path) {
@@ -104,8 +123,10 @@ export async function apiFetch(path, options = {}) {
     }
   }
 
+  const token = getAuthToken();
   const headers = {
     "Content-Type": "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...(options.headers || {})
   };
 

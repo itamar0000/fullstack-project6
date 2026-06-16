@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { IconPlus } from "../../components/icons.jsx";
 
 const EMPTY_POST = { title: "", body: "" };
 
@@ -43,6 +44,7 @@ function PostCreateForm({ onCreate }) {
         />
       </label>
       <button type="submit" className="primary-button" disabled={submitting}>
+        <IconPlus className="icon" />
         Add post
       </button>
     </form>

@@ -1,5 +1,6 @@
 import { Router } from "express";
 import pool from "../db.js";
+import { requireAuth } from "../middleware/auth.js";
 
 const router = Router();
 
@@ -21,24 +22,27 @@ router.get("/:id", async (req, res) => {
   res.json(row);
 });
 
-// POST /albums
-router.post("/", async (req, res) => {
-  const { userId, title } = req.body;
+// POST /albums  (always created for the authenticated user)
+router.post("/", requireAuth, async (req, res) => {
+  const { title } = req.body;
   const [result] = await pool.execute(
     "INSERT INTO albums (userId, title) VALUES (?,?)",
-    [userId, title]
+    [req.userId, title]
   );
   const [[row]] = await pool.execute("SELECT * FROM albums WHERE id = ?", [result.insertId]);
   res.status(201).json(row);
 });
 
-// PUT/PATCH /albums/:id
-router.put("/:id", handleUpdate);
-router.patch("/:id", handleUpdate);
+// PUT/PATCH /albums/:id  (only the owning user may update)
+router.put("/:id", requireAuth, handleUpdate);
+router.patch("/:id", requireAuth, handleUpdate);
 
 async function handleUpdate(req, res) {
   const [[existing]] = await pool.execute("SELECT * FROM albums WHERE id = ?", [req.params.id]);
   if (!existing) return res.status(404).json({ message: "Not found" });
+  if (existing.userId !== req.userId) {
+    return res.status(403).json({ message: "You can only update your own albums" });
+  }
 
   const title = req.body.title ?? existing.title;
   await pool.execute("UPDATE albums SET title=? WHERE id=?", [title, req.params.id]);
@@ -46,8 +50,13 @@ async function handleUpdate(req, res) {
   res.json(row);
 }
 
-// DELETE /albums/:id
-router.delete("/:id", async (req, res) => {
+// DELETE /albums/:id  (only the owning user may delete)
+router.delete("/:id", requireAuth, async (req, res) => {
+  const [[existing]] = await pool.execute("SELECT * FROM albums WHERE id = ?", [req.params.id]);
+  if (!existing) return res.status(404).json({ message: "Not found" });
+  if (existing.userId !== req.userId) {
+    return res.status(403).json({ message: "You can only delete your own albums" });
+  }
   await pool.execute("DELETE FROM albums WHERE id = ?", [req.params.id]);
   res.json({});
 });

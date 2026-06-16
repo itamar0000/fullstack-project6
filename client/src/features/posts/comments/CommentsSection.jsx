@@ -2,13 +2,17 @@ import React from "react";
 import { ErrorState, LoadingState } from "../../../components/Status.jsx";
 import CommentCreateForm from "./CommentCreateForm.jsx";
 import CommentItem from "./CommentItem.jsx";
+import { IconComment } from "../../../components/icons.jsx";
 
 function CommentsSection({ commentsState, currentUser }) {
   return (
     <section className="comments-block">
       <div className="section-heading compact">
         <p className="eyebrow">Comments</p>
-        <h3>{commentsState.comments.length} comments</h3>
+        <h3>
+          <IconComment className="icon" />
+          {commentsState.comments.length} comments
+        </h3>
       </div>
 
       <CommentCreateForm onCreate={commentsState.createComment} />

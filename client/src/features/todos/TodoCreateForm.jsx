@@ -1,4 +1,5 @@
 import React, { useRef, useState } from "react";
+import { IconPlus } from "../../components/icons.jsx";
 
 function TodoCreateForm({ onCreate }) {
   const [title, setTitle] = useState("");
@@ -35,6 +36,7 @@ function TodoCreateForm({ onCreate }) {
         />
       </label>
       <button type="submit" className="primary-button" disabled={submitting}>
+        <IconPlus className="icon" />
         Add
       </button>
     </form>

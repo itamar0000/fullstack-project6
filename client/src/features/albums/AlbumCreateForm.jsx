@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { IconPlus } from "../../components/icons.jsx";
 
 function AlbumCreateForm({ onCreate }) {
   const [title, setTitle] = useState("");
@@ -28,6 +29,7 @@ function AlbumCreateForm({ onCreate }) {
         <input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Album title" />
       </label>
       <button type="submit" className="primary-button" disabled={submitting}>
+        <IconPlus className="icon" />
         Add
       </button>
     </form>

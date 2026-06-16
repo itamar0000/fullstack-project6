@@ -1,5 +1,6 @@
 import { Router } from "express";
 import pool from "../db.js";
+import { requireAuth } from "../middleware/auth.js";
 
 const router = Router();
 
@@ -21,24 +22,27 @@ router.get("/:id", async (req, res) => {
   res.json({ ...row, completed: !!row.completed });
 });
 
-// POST /todos
-router.post("/", async (req, res) => {
-  const { userId, title, completed = false } = req.body;
+// POST /todos  (always created for the authenticated user)
+router.post("/", requireAuth, async (req, res) => {
+  const { title, completed = false } = req.body;
   const [result] = await pool.execute(
     "INSERT INTO todos (userId, title, completed) VALUES (?,?,?)",
-    [userId, title, completed ? 1 : 0]
+    [req.userId, title, completed ? 1 : 0]
   );
   const [[row]] = await pool.execute("SELECT * FROM todos WHERE id = ?", [result.insertId]);
   res.status(201).json({ ...row, completed: !!row.completed });
 });
 
-// PUT/PATCH /todos/:id
-router.put("/:id", handleUpdate);
-router.patch("/:id", handleUpdate);
+// PUT/PATCH /todos/:id  (only the owning user may update)
+router.put("/:id", requireAuth, handleUpdate);
+router.patch("/:id", requireAuth, handleUpdate);
 
 async function handleUpdate(req, res) {
   const [[existing]] = await pool.execute("SELECT * FROM todos WHERE id = ?", [req.params.id]);
   if (!existing) return res.status(404).json({ message: "Not found" });
+  if (existing.userId !== req.userId) {
+    return res.status(403).json({ message: "You can only update your own todos" });
+  }
 
   const title = req.body.title ?? existing.title;
   const completed = req.body.completed !== undefined ? req.body.completed : !!existing.completed;
@@ -51,8 +55,13 @@ async function handleUpdate(req, res) {
   res.json({ ...row, completed: !!row.completed });
 }
 
-// DELETE /todos/:id
-router.delete("/:id", async (req, res) => {
+// DELETE /todos/:id  (only the owning user may delete)
+router.delete("/:id", requireAuth, async (req, res) => {
+  const [[existing]] = await pool.execute("SELECT * FROM todos WHERE id = ?", [req.params.id]);
+  if (!existing) return res.status(404).json({ message: "Not found" });
+  if (existing.userId !== req.userId) {
+    return res.status(403).json({ message: "You can only delete your own todos" });
+  }
   await pool.execute("DELETE FROM todos WHERE id = ?", [req.params.id]);
   res.json({});
 });

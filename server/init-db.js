@@ -1,4 +1,5 @@
 import mysql from "mysql2/promise";
+import bcrypt from "bcryptjs";
 import { dbConfig } from "./config.js";
 
 // Connect without selecting a database so we can create it if missing.
@@ -62,12 +63,28 @@ await ROOT.execute(`
   CREATE TABLE IF NOT EXISTS comments (
     id     INT AUTO_INCREMENT PRIMARY KEY,
     postId INT NOT NULL,
+    userId INT NULL,
     name   VARCHAR(255),
     email  VARCHAR(255),
     body   TEXT,
-    FOREIGN KEY (postId) REFERENCES posts(id) ON DELETE CASCADE
+    FOREIGN KEY (postId) REFERENCES posts(id) ON DELETE CASCADE,
+    FOREIGN KEY (userId) REFERENCES users(id) ON DELETE SET NULL
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
 `);
+
+// ── Migration: older databases were created before the userId column existed ──
+const [[{ cnt: hasUserIdCol }]] = await ROOT.query(
+  `SELECT COUNT(*) AS cnt FROM INFORMATION_SCHEMA.COLUMNS
+   WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'comments' AND COLUMN_NAME = 'userId'`,
+  [database]
+);
+if (!hasUserIdCol) {
+  await ROOT.execute(
+    `ALTER TABLE comments
+     ADD COLUMN userId INT NULL AFTER postId,
+     ADD FOREIGN KEY (userId) REFERENCES users(id) ON DELETE SET NULL`
+  );
+}
 
 await ROOT.execute(`
   CREATE TABLE IF NOT EXISTS albums (
@@ -106,15 +123,21 @@ if (Number(cnt) === 0) {
   ];
 
   for (const u of users) {
+    // u[5] is the seed "password" for this demo dataset — it's hashed below and
+    // never written into the users.website column, so it can't leak via GET /users.
+    const seedPassword = u[5];
+    const row = [...u];
+    row[5] = "";
+
     await ROOT.execute(
       `INSERT INTO users (id,name,username,email,phone,website,street,suite,city,zipcode,company_name,company_catchphrase,company_bs)
        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-      u
+      row
     );
-    // store password = website field value
+    const hash = await bcrypt.hash(seedPassword, 10);
     await ROOT.execute(
       "INSERT INTO user_passwords (user_id, password) VALUES (?,?)",
-      [u[0], u[5]]
+      [u[0], hash]
     );
   }
 
@@ -153,14 +176,14 @@ if (Number(cnt) === 0) {
   }
 
   const comments = [
-    [1,1,"Leanne Graham","Sincere@april.biz","laudantium enim quasi est quidem magnam voluptate ipsam eos tempora"],
-    [2,1,"Ervin Howell","Shanna@melissa.tv","est natus enim nihil est dolore omnis voluptatem numquam"],
-    [3,2,"Leanne Graham","Sincere@april.biz","quia molestiae reprehenderit quasi aspernatur"],
-    [4,3,"Ervin Howell","Shanna@melissa.tv","non et atque occaecati deserunt quas accusantium unde odit nobis qui voluptatem"],
-    [5,1,"ערן קליין","eran@kleincpa.co.il","we"],
+    [1,1,1,"Leanne Graham","Sincere@april.biz","laudantium enim quasi est quidem magnam voluptate ipsam eos tempora"],
+    [2,1,2,"Ervin Howell","Shanna@melissa.tv","est natus enim nihil est dolore omnis voluptatem numquam"],
+    [3,2,1,"Leanne Graham","Sincere@april.biz","quia molestiae reprehenderit quasi aspernatur"],
+    [4,3,2,"Ervin Howell","Shanna@melissa.tv","non et atque occaecati deserunt quas accusantium unde odit nobis qui voluptatem"],
+    [5,1,7,"ערן קליין","eran@kleincpa.co.il","we"],
   ];
   for (const c of comments) {
-    await ROOT.execute("INSERT INTO comments (id,postId,name,email,body) VALUES (?,?,?,?,?)", c);
+    await ROOT.execute("INSERT INTO comments (id,postId,userId,name,email,body) VALUES (?,?,?,?,?,?)", c);
   }
 
   const albums = [
@@ -192,6 +215,24 @@ if (Number(cnt) === 0) {
   console.log("Seeding complete.");
 } else {
   console.log(`Database already has ${cnt} user(s), skipping seed.`);
+}
+
+// ── Migration: older databases stored plaintext passwords and leaked them via
+// the users.website column. Hash anything still plaintext and scrub website. ──
+const [plaintextPasswords] = await ROOT.execute(
+  "SELECT user_id, password FROM user_passwords WHERE password NOT LIKE '$2%'"
+);
+for (const row of plaintextPasswords) {
+  const hash = await bcrypt.hash(row.password, 10);
+  await ROOT.execute("UPDATE user_passwords SET password = ? WHERE user_id = ?", [hash, row.user_id]);
+}
+if (plaintextPasswords.length) {
+  console.log(`Migrated ${plaintextPasswords.length} plaintext password(s) to bcrypt hashes.`);
+}
+
+const [websiteScrub] = await ROOT.execute("UPDATE users SET website = '' WHERE website <> ''");
+if (websiteScrub.affectedRows) {
+  console.log(`Cleared leaked password value out of website field for ${websiteScrub.affectedRows} user(s).`);
 }
 
 await ROOT.end();

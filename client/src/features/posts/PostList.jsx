@@ -1,4 +1,5 @@
 import React from "react";
+import { IconDocument } from "../../components/icons.jsx";
 
 function PostList({ posts, selectedPostId, onSelectPost }) {
   return (
@@ -10,8 +11,13 @@ function PostList({ posts, selectedPostId, onSelectPost }) {
           key={post.id}
           onClick={() => onSelectPost(post.id)}
         >
-          <span className="resource-id">#{post.id}</span>
-          <strong>{post.title}</strong>
+          <span className="post-row-icon">
+            <IconDocument />
+          </span>
+          <div>
+            <span className="resource-id">#{post.id}</span>
+            <strong>{post.title}</strong>
+          </div>
         </button>
       ))}
     </div>

@@ -8,9 +8,18 @@ function clearResourceCache(resource) {
   clearCache(`/${resource}`);
 }
 
+export const authApi = {
+  async login(username, password) {
+    return apiFetch("/auth/login", {
+      method: "POST",
+      body: jsonBody({ username, password })
+    });
+  }
+};
+
 export const usersApi = {
-  async getByUsername(username,password) {
-    const users = await apiFetch(`/users${buildQuery({ username , website: password })}`);
+  async getByUsername(username) {
+    const users = await apiFetch(`/users${buildQuery({ username })}`);
     return users.find((user) => user.username === username) || null;
   },
 

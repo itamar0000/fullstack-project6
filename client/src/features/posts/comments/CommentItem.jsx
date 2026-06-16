@@ -1,4 +1,14 @@
 import React, { useState } from "react";
+import { IconCheck, IconPencil, IconTrash, IconX } from "../../../components/icons.jsx";
+
+function getInitials(name) {
+  return (name || "")
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join("");
+}
 
 function CommentItem({ comment, currentUser, onDelete, onUpdate }) {
   const [editing, setEditing] = useState(false);
@@ -26,8 +36,16 @@ function CommentItem({ comment, currentUser, onDelete, onUpdate }) {
   return (
     <article className="comment-item">
       <header>
-        <strong>{comment.name}</strong>
-        <span>{comment.email}</span>
+        <div className="comment-author">
+          <span className="user-avatar" aria-hidden="true">
+            {getInitials(comment.name)}
+          </span>
+          <div>
+            <strong>{comment.name}</strong>
+            <span className="comment-email">{comment.email}</span>
+          </div>
+        </div>
+        {isOwner && <span className="badge-owner">You</span>}
       </header>
       {editing ? (
         <input value={body} onChange={(event) => setBody(event.target.value)} />
@@ -39,18 +57,22 @@ function CommentItem({ comment, currentUser, onDelete, onUpdate }) {
           {editing ? (
             <>
               <button type="button" className="primary-button small" onClick={handleSave}>
+                <IconCheck className="icon" />
                 Save
               </button>
               <button type="button" className="ghost-button small" onClick={cancelEdit}>
+                <IconX className="icon" />
                 Cancel
               </button>
             </>
           ) : (
             <button type="button" className="ghost-button small" onClick={() => setEditing(true)}>
+              <IconPencil className="icon" />
               Edit
             </button>
           )}
           <button type="button" className="danger-button small" onClick={() => onDelete(comment)}>
+            <IconTrash className="icon" />
             Delete
           </button>
         </div>

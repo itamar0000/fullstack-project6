@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { EmptyState } from "../../components/Status.jsx";
 import { usePostComments } from "./usePostComments.js";
 import CommentsSection from "./comments/CommentsSection.jsx";
+import { IconCheck, IconPencil, IconTrash, IconX } from "../../components/icons.jsx";
 
 function PostDetails({ post, currentUser, onDelete, onUpdate }) {
   const [draft, setDraft] = useState(null);
@@ -44,9 +45,11 @@ function PostDetails({ post, currentUser, onDelete, onUpdate }) {
         {currentUser.id === post.userId && (
           <div className="row-actions">
             <button type="button" className="ghost-button small" onClick={() => setDraft(post)}>
+              <IconPencil className="icon" />
               Edit
             </button>
             <button type="button" className="danger-button small" onClick={handleDelete}>
+              <IconTrash className="icon" />
               Delete
             </button>
           </div>
@@ -73,9 +76,11 @@ function PostDetails({ post, currentUser, onDelete, onUpdate }) {
           </label>
           <div className="row-actions">
             <button type="submit" className="primary-button small">
+              <IconCheck className="icon" />
               Save
             </button>
             <button type="button" className="ghost-button small" onClick={() => setDraft(null)}>
+              <IconX className="icon" />
               Cancel
             </button>
           </div>

@@ -5,6 +5,7 @@ import { appRoutes } from "../../../routes/paths.js";
 import { useAlbumPhotos } from "../useAlbumPhotos.js";
 import PhotoCard from "./PhotoCard.jsx";
 import PhotoCreateForm from "./PhotoCreateForm.jsx";
+import { IconArrowLeft } from "../../../components/icons.jsx";
 
 function PhotosPanel({ album }) {
   const photosState = useAlbumPhotos(album);
@@ -17,6 +18,7 @@ function PhotosPanel({ album }) {
           <h3>{album.title}</h3>
         </div>
         <Link className="ghost-button small" to={appRoutes.userAlbums(album.userId)}>
+          <IconArrowLeft className="icon" />
           Back to albums
         </Link>
       </div>

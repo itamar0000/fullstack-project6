@@ -20,10 +20,6 @@ function UserInfo({ user }) {
         <dd>{user.phone}</dd>
       </div>
       <div>
-        <dt>Website password</dt>
-        <dd>{user.website}</dd>
-      </div>
-      <div>
         <dt>Address</dt>
         <dd>
           {user.address?.street}, {user.address?.suite}, {user.address?.city}{" "}

@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { makeDefaultPhotoUrl } from "../photoUrls.js";
+import { IconPlus } from "../../../components/icons.jsx";
 
 function PhotoCreateForm({ onCreate }) {
   const [draft, setDraft] = useState({
@@ -48,6 +49,7 @@ function PhotoCreateForm({ onCreate }) {
         />
       </label>
       <button type="submit" className="primary-button" disabled={submitting}>
+        <IconPlus className="icon" />
         Add photo
       </button>
     </form>
