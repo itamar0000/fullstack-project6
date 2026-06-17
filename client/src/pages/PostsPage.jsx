@@ -39,7 +39,7 @@ function PostsPage() {
     <section className="page-section split-page">
       <div className="section-heading">
         <p className="eyebrow">Posts</p>
-        <h2>Posts and comments</h2>
+        <h2>All posts and comments</h2>
       </div>
 
       <ErrorState message={postsState.error} />
@@ -63,6 +63,20 @@ function PostsPage() {
             selectedPostId={selectedPostState.selectedPostId}
             onSelectPost={selectedPostState.selectPost}
           />
+
+          <p className="pagination-status">
+            Loaded {postsState.posts.length} of {postsState.totalCount} posts
+          </p>
+          {postsState.hasMore && (
+            <button
+              type="button"
+              className="secondary-button load-more"
+              disabled={postsState.loadingMore}
+              onClick={postsState.loadMore}
+            >
+              {postsState.loadingMore ? "Loading..." : "Load more"}
+            </button>
+          )}
         </section>
 
         <section className="plain-panel">

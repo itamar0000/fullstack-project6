@@ -1,6 +1,36 @@
 import axios from "axios";
 
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:3001";
+function getDefaultApiBaseUrl() {
+  if (typeof window !== "undefined" && window.location.hostname) {
+    return `${window.location.protocol}//${window.location.hostname}:3001`;
+  }
+
+  return "http://127.0.0.1:3001";
+}
+
+function getApiBaseUrl() {
+  const configuredUrl = import.meta.env.VITE_API_BASE_URL;
+
+  if (!configuredUrl) {
+    return getDefaultApiBaseUrl();
+  }
+
+  if (typeof window === "undefined") {
+    return configuredUrl;
+  }
+
+  try {
+    const url = new URL(configuredUrl, window.location.origin);
+    const pointsAtFrontend =
+      url.hostname === window.location.hostname && url.port === window.location.port;
+
+    return pointsAtFrontend ? getDefaultApiBaseUrl() : configuredUrl;
+  } catch {
+    return getDefaultApiBaseUrl();
+  }
+}
+
+export const API_BASE_URL = getApiBaseUrl();
 
 const MEMORY_CACHE = new Map();
 const CACHE_STORAGE_KEY = "project5.apiCache";
@@ -102,7 +132,20 @@ export function clearCache(match = "") {
 
 async function parseResponse(response, path) {
   const text = await response.text();
-  const payload = text ? JSON.parse(text) : null;
+  let payload = null;
+
+  if (text) {
+    try {
+      payload = JSON.parse(text);
+    } catch {
+      const looksLikeHtml = text.trim().startsWith("<");
+      const message = looksLikeHtml
+        ? "API returned HTML instead of JSON. Make sure the Express server is running on port 3001 and VITE_API_BASE_URL is not pointing to the React dev server."
+        : "API returned an invalid JSON response.";
+
+      throw new ApiError(message, response.status, path);
+    }
+  }
 
   if (!response.ok) {
     const message = payload?.message || response.statusText || "Request failed";
@@ -157,7 +200,19 @@ export async function apiAxiosGet(path) {
   }
 
   try {
-    const response = await axiosClient.get(path);
+    const token = getAuthToken();
+    const response = await axiosClient.get(path, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {}
+    });
+
+    if (typeof response.data === "string" && response.data.trim().startsWith("<")) {
+      throw new ApiError(
+        "API returned HTML instead of JSON. Make sure the Express server is running on port 3001 and VITE_API_BASE_URL is not pointing to the React dev server.",
+        response.status,
+        path
+      );
+    }
+
     const payload = {
       data: response.data,
       totalCount: Number(response.headers["x-total-count"] || response.data.length || 0)
@@ -166,6 +221,10 @@ export async function apiAxiosGet(path) {
     setCached(cacheKey, payload);
     return cloneData(payload);
   } catch (error) {
+    if (error instanceof ApiError) {
+      throw error;
+    }
+
     const status = error.response?.status || 0;
     const message = error.response?.statusText || error.message || "Request failed";
     throw new ApiError(message, status, path);

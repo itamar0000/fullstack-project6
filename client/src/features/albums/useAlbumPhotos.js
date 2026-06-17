@@ -2,8 +2,6 @@ import { useEffect, useState } from "react";
 import { photosApi } from "../../api/resources.js";
 import { makeThumbnailUrl } from "./photoUrls.js";
 
-const PHOTO_PAGE_SIZE = 6;
-
 function assertPhotoInAlbum(photo, albumId) {
   if (photo.albumId !== albumId) {
     throw new Error("You can only manage photos in the selected album.");
@@ -22,10 +20,15 @@ export function useAlbumPhotos(album) {
     setError("");
 
     try {
-      const payload = await photosApi.getPage(album.id, nextPage, PHOTO_PAGE_SIZE);
-      setPhotos((items) => (replace ? payload.items : [...items, ...payload.items]));
+      const payload = await photosApi.getPage(album.id, nextPage);
+      let loadedCount = payload.items.length;
+      setPhotos((items) => {
+        const nextItems = replace ? payload.items : [...items, ...payload.items];
+        loadedCount = nextItems.length;
+        return nextItems;
+      });
       setPage(nextPage);
-      setHasMore(payload.items.length === PHOTO_PAGE_SIZE);
+      setHasMore(loadedCount < payload.totalCount);
       return payload;
     } catch (err) {
       setError(err.message);
@@ -46,10 +49,10 @@ export function useAlbumPhotos(album) {
       setError("");
 
       try {
-        const payload = await photosApi.getPage(album.id, 1, PHOTO_PAGE_SIZE);
+        const payload = await photosApi.getPage(album.id, 1);
         if (active) {
           setPhotos(payload.items);
-          setHasMore(payload.items.length === PHOTO_PAGE_SIZE);
+          setHasMore(payload.items.length < payload.totalCount);
         }
       } catch (err) {
         if (active) {

@@ -37,6 +37,24 @@ export function IconInfo(props) {
   );
 }
 
+export function IconUser(props) {
+  return (
+    <Icon {...props}>
+      <circle cx="12" cy="8" r="3.4" />
+      <path d="M5.2 20a6.8 6.8 0 0 1 13.6 0" />
+    </Icon>
+  );
+}
+
+export function IconShield(props) {
+  return (
+    <Icon {...props}>
+      <path d="M12 3.5 19 6v5.2c0 4.1-2.8 7.7-7 9.3-4.2-1.6-7-5.2-7-9.3V6Z" />
+      <path d="M9.2 12.2 11.1 14l3.8-4.1" />
+    </Icon>
+  );
+}
+
 export function IconCheckCircle(props) {
   return (
     <Icon {...props}>

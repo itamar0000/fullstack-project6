@@ -42,6 +42,20 @@ function TodosPage() {
         onRename={todosState.renameTodo}
         onToggle={todosState.toggleTodo}
       />
+
+      <p className="pagination-status">
+        Loaded {todosState.todos.length} of {todosState.totalCount} todos
+      </p>
+      {todosState.hasMore && (
+        <button
+          type="button"
+          className="secondary-button load-more"
+          disabled={todosState.loadingMore}
+          onClick={todosState.loadMore}
+        >
+          {todosState.loadingMore ? "Loading..." : "Load more"}
+        </button>
+      )}
     </section>
   );
 }

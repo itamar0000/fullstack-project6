@@ -16,6 +16,7 @@ router.post("/login", async (req, res) => {
 
   const [[user]] = await pool.execute("SELECT * FROM users WHERE username = ?", [username]);
   if (!user) return res.status(401).json({ message: "Invalid username or password" });
+  if (user.is_blocked) return res.status(403).json({ message: "This account is blocked" });
 
   const [[record]] = await pool.execute(
     "SELECT password FROM user_passwords WHERE user_id = ?",

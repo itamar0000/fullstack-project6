@@ -1,17 +1,31 @@
 import { Router } from "express";
 import pool from "../db.js";
+import { logAction } from "../audit.js";
 import { requireAuth } from "../middleware/auth.js";
+import { getPagination, setTotalCountHeader } from "../pagination.js";
 
 const router = Router();
 
-// GET /comments or /comments?postId=X
+// GET /comments or /comments?postId=X&_page=N
 router.get("/", async (req, res) => {
   const { postId } = req.query;
-  let sql = "SELECT * FROM comments";
+  let countSql = "SELECT COUNT(*) AS total FROM comments";
+  let dataSql = "SELECT * FROM comments";
   const params = [];
-  if (postId) { sql += " WHERE postId = ?"; params.push(postId); }
-  sql += " ORDER BY id";
-  const [rows] = await pool.execute(sql, params);
+
+  if (postId) {
+    countSql += " WHERE postId = ?";
+    dataSql += " WHERE postId = ?";
+    params.push(postId);
+  }
+
+  const [[{ total }]] = await pool.execute(countSql, params);
+  setTotalCountHeader(res, total);
+
+  const { limit, offset } = getPagination(req.query, 2);
+  dataSql += ` ORDER BY id LIMIT ${limit} OFFSET ${offset}`;
+
+  const [rows] = await pool.execute(dataSql, params);
   res.json(rows);
 });
 
@@ -30,6 +44,7 @@ router.post("/", requireAuth, async (req, res) => {
     [postId, req.userId, name, email, body]
   );
   const [[row]] = await pool.execute("SELECT * FROM comments WHERE id = ?", [result.insertId]);
+  await logAction(req.userId, "CREATE_COMMENT", "comments", row.id, { postId });
   res.status(201).json(row);
 });
 
@@ -53,6 +68,7 @@ async function handleUpdate(req, res) {
     [name, email, body, req.params.id]
   );
   const [[row]] = await pool.execute("SELECT * FROM comments WHERE id = ?", [req.params.id]);
+  await logAction(req.userId, "UPDATE_COMMENT", "comments", row.id);
   res.json(row);
 }
 
@@ -63,6 +79,7 @@ router.delete("/:id", requireAuth, async (req, res) => {
   if (existing.userId !== req.userId) {
     return res.status(403).json({ message: "You can only delete your own comments" });
   }
+  await logAction(req.userId, "DELETE_COMMENT", "comments", Number(req.params.id));
   await pool.execute("DELETE FROM comments WHERE id = ?", [req.params.id]);
   res.json({});
 });

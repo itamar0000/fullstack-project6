@@ -2,6 +2,11 @@ export const appRoutes = {
   login: "/login",
   register: "/register",
   home: "/home",
+  admin: "/admin",
+
+  userHome(userId) {
+    return `/users/${userId}`;
+  },
 
   userTodos(userId) {
     return `/users/${userId}/todos`;
@@ -15,6 +20,10 @@ export const appRoutes = {
     return `/users/${userId}/albums`;
   },
 
+  userAccount(userId) {
+    return `/users/${userId}/account`;
+  },
+
   albumPhotos(userId, albumId) {
     return `/users/${userId}/albums/${albumId}/photos`;
   },
@@ -24,6 +33,7 @@ export const appRoutes = {
     todos: "todos",
     posts: "posts",
     albums: "albums",
+    account: "account",
     albumPhotos: "albums/:albumId/photos"
   }
 };

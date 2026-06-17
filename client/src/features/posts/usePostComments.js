@@ -10,7 +10,10 @@ function assertCommentOwner(comment, userId) {
 export function usePostComments(postId, currentUser) {
   const [comments, setComments] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState("");
+  const [page, setPage] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
 
   useEffect(() => {
     let active = true;
@@ -26,9 +29,11 @@ export function usePostComments(postId, currentUser) {
       setError("");
 
       try {
-        const data = await commentsApi.listByPost(postId);
+        const payload = await commentsApi.getPageByPost(postId, 1);
         if (active) {
-          setComments(data);
+          setComments(payload.items);
+          setTotalCount(payload.totalCount);
+          setPage(1);
         }
       } catch (err) {
         if (active) {
@@ -47,6 +52,27 @@ export function usePostComments(postId, currentUser) {
     };
   }, [postId]);
 
+  async function loadMore() {
+    if (!postId || loadingMore || comments.length >= totalCount) {
+      return;
+    }
+
+    setLoadingMore(true);
+    setError("");
+
+    try {
+      const nextPage = page + 1;
+      const payload = await commentsApi.getPageByPost(postId, nextPage);
+      setComments((items) => [...items, ...payload.items]);
+      setTotalCount(payload.totalCount);
+      setPage(nextPage);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoadingMore(false);
+    }
+  }
+
   async function createComment(body) {
     if (!postId) {
       return null;
@@ -63,6 +89,7 @@ export function usePostComments(postId, currentUser) {
         body
       });
       setComments((items) => [...items, created]);
+      setTotalCount((count) => count + 1);
       return created;
     } catch (err) {
       setError(err.message);
@@ -91,6 +118,7 @@ export function usePostComments(postId, currentUser) {
       assertCommentOwner(comment, currentUser.id);
       await commentsApi.remove(comment.id);
       setComments((items) => items.filter((item) => item.id !== comment.id));
+      setTotalCount((count) => Math.max(0, count - 1));
       return true;
     } catch (err) {
       setError(err.message);
@@ -101,9 +129,13 @@ export function usePostComments(postId, currentUser) {
   return {
     comments,
     loading,
+    loadingMore,
     error,
+    hasMore: comments.length < totalCount,
+    totalCount,
     createComment,
     updateComment,
-    deleteComment
+    deleteComment,
+    loadMore
   };
 }

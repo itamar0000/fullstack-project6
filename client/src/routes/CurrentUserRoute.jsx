@@ -9,7 +9,7 @@ function CurrentUserRoute() {
   const requestedUserId = Number(userId);
 
   if (requestedUserId !== currentUser.id) {
-    return <Navigate to={appRoutes.home} replace />;
+    return <Navigate to={appRoutes.userHome(currentUser.id)} replace />;
   }
 
   return <Outlet />;

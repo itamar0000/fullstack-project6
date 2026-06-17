@@ -10,8 +10,11 @@ function assertTodoOwner(todo, userId) {
 export function useTodos(userId) {
   const [todos, setTodos] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [busyId, setBusyId] = useState(null);
   const [error, setError] = useState("");
+  const [page, setPage] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
 
   useEffect(() => {
     let active = true;
@@ -21,9 +24,11 @@ export function useTodos(userId) {
       setError("");
 
       try {
-        const data = await todosApi.listByUser(userId);
+        const payload = await todosApi.getPageByUser(userId, 1);
         if (active) {
-          setTodos(data);
+          setTodos(payload.items);
+          setTotalCount(payload.totalCount);
+          setPage(1);
         }
       } catch (err) {
         if (active) {
@@ -42,6 +47,27 @@ export function useTodos(userId) {
     };
   }, [userId]);
 
+  async function loadMore() {
+    if (loadingMore || todos.length >= totalCount) {
+      return;
+    }
+
+    setLoadingMore(true);
+    setError("");
+
+    try {
+      const nextPage = page + 1;
+      const payload = await todosApi.getPageByUser(userId, nextPage);
+      setTodos((items) => [...items, ...payload.items]);
+      setTotalCount(payload.totalCount);
+      setPage(nextPage);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoadingMore(false);
+    }
+  }
+
   async function createTodo(title) {
     setError("");
 
@@ -52,6 +78,7 @@ export function useTodos(userId) {
         completed: false
       });
       setTodos((items) => [...items, created]);
+      setTotalCount((count) => count + 1);
       return created;
     } catch (err) {
       setError(err.message);
@@ -67,6 +94,7 @@ export function useTodos(userId) {
       assertTodoOwner(todo, userId);
       await todosApi.remove(todo.id);
       setTodos((items) => items.filter((item) => item.id !== todo.id));
+      setTotalCount((count) => Math.max(0, count - 1));
       return true;
     } catch (err) {
       setError(err.message);
@@ -113,11 +141,15 @@ export function useTodos(userId) {
   return {
     todos,
     loading,
+    loadingMore,
     busyId,
     error,
+    hasMore: todos.length < totalCount,
+    totalCount,
     createTodo,
     deleteTodo,
     toggleTodo,
-    renameTodo
+    renameTodo,
+    loadMore
   };
 }

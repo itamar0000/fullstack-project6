@@ -4,7 +4,16 @@ import Modal from "../components/Modal.jsx";
 import UserInfo from "../components/UserInfo.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
 import { appRoutes } from "../routes/paths.js";
-import { IconCheckCircle, IconDocument, IconHome, IconImages, IconInfo, IconLogout } from "../components/icons.jsx";
+import {
+  IconCheckCircle,
+  IconDocument,
+  IconHome,
+  IconImages,
+  IconInfo,
+  IconLogout,
+  IconShield,
+  IconUser
+} from "../components/icons.jsx";
 
 function getInitials(name) {
   return (name || "")
@@ -47,7 +56,7 @@ function AppLayout() {
         </div>
 
         <nav className="topnav" aria-label="Primary">
-          <NavLink to={appRoutes.home}>
+          <NavLink to={appRoutes.userHome(currentUser.id)}>
             <IconHome className="icon" />
             Home
           </NavLink>
@@ -55,6 +64,10 @@ function AppLayout() {
             <IconInfo className="icon" />
             Info
           </button>
+          <NavLink to={appRoutes.userAccount(currentUser.id)}>
+            <IconUser className="icon" />
+            Account
+          </NavLink>
           <NavLink to={appRoutes.userTodos(currentUser.id)}>
             <IconCheckCircle className="icon" />
             Todos
@@ -67,6 +80,12 @@ function AppLayout() {
             <IconImages className="icon" />
             Albums
           </NavLink>
+          {currentUser.isAdmin && (
+            <NavLink to={appRoutes.admin}>
+              <IconShield className="icon" />
+              Admin
+            </NavLink>
+          )}
           <button type="button" className="danger-button" onClick={handleLogout}>
             <IconLogout className="icon" />
             Logout

@@ -10,7 +10,10 @@ function assertAlbumOwner(album, userId) {
 export function useAlbums(userId) {
   const [albums, setAlbums] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState("");
+  const [page, setPage] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
 
   useEffect(() => {
     let active = true;
@@ -20,9 +23,11 @@ export function useAlbums(userId) {
       setError("");
 
       try {
-        const data = await albumsApi.listByUser(userId);
+        const payload = await albumsApi.getPageByUser(userId, 1);
         if (active) {
-          setAlbums(data);
+          setAlbums(payload.items);
+          setTotalCount(payload.totalCount);
+          setPage(1);
         }
       } catch (err) {
         if (active) {
@@ -41,6 +46,27 @@ export function useAlbums(userId) {
     };
   }, [userId]);
 
+  async function loadMore() {
+    if (loadingMore || albums.length >= totalCount) {
+      return;
+    }
+
+    setLoadingMore(true);
+    setError("");
+
+    try {
+      const nextPage = page + 1;
+      const payload = await albumsApi.getPageByUser(userId, nextPage);
+      setAlbums((items) => [...items, ...payload.items]);
+      setTotalCount(payload.totalCount);
+      setPage(nextPage);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoadingMore(false);
+    }
+  }
+
   async function createAlbum(title) {
     setError("");
 
@@ -50,6 +76,7 @@ export function useAlbums(userId) {
         title
       });
       setAlbums((items) => [...items, created]);
+      setTotalCount((count) => count + 1);
       return created;
     } catch (err) {
       setError(err.message);
@@ -78,6 +105,7 @@ export function useAlbums(userId) {
       assertAlbumOwner(album, userId);
       await albumsApi.remove(album.id);
       setAlbums((items) => items.filter((item) => item.id !== album.id));
+      setTotalCount((count) => Math.max(0, count - 1));
       return true;
     } catch (err) {
       setError(err.message);
@@ -88,9 +116,13 @@ export function useAlbums(userId) {
   return {
     albums,
     loading,
+    loadingMore,
     error,
+    hasMore: albums.length < totalCount,
+    totalCount,
     createAlbum,
     renameAlbum,
-    deleteAlbum
+    deleteAlbum,
+    loadMore
   };
 }

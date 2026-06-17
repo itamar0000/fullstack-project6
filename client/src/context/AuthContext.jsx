@@ -70,12 +70,25 @@ export function AuthProvider({ children }) {
     persistUser(null);
   }
 
+  async function updateProfile(profile) {
+    const updatedUser = await usersApi.update(currentUser.id, profile);
+    setCurrentUser(updatedUser);
+    persistUser(updatedUser);
+    return updatedUser;
+  }
+
+  function changePassword(currentPassword, newPassword) {
+    return usersApi.changePassword(currentUser.id, currentPassword, newPassword);
+  }
+
   const value = useMemo(
     () => ({
+      changePassword,
       currentUser,
       login,
       logout,
-      register
+      register,
+      updateProfile
     }),
     [currentUser]
   );

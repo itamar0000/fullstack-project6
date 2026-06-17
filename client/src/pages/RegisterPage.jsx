@@ -60,8 +60,8 @@ function RegisterPage() {
     setError("");
 
     try {
-      await registerUser(credentials, values);
-      navigate(appRoutes.home, { replace: true });
+      const user = await registerUser(credentials, values);
+      navigate(appRoutes.userHome(user.id), { replace: true });
     } catch (err) {
       setError(err.message);
     }

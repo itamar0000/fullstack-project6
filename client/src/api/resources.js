@@ -29,12 +29,32 @@ export const usersApi = {
       method: "POST",
       body: jsonBody(user)
     });
+  },
+
+  async update(id, changes) {
+    clearResourceCache("users");
+    return apiFetch(`/users/${id}`, {
+      method: "PATCH",
+      body: jsonBody(changes)
+    });
+  },
+
+  async changePassword(id, currentPassword, newPassword) {
+    return apiFetch(`/users/${id}/password`, {
+      method: "PATCH",
+      body: jsonBody({ currentPassword, newPassword })
+    });
   }
 };
 
 export const todosApi = {
-  listByUser(userId) {
-    return apiFetch(`/todos${buildQuery({ userId })}`);
+  async getPageByUser(userId, page) {
+    const payload = await apiAxiosGet(`/todos${buildQuery({ userId, _page: page })}`);
+
+    return {
+      items: payload.data,
+      totalCount: payload.totalCount
+    };
   },
 
   async create(todo) {
@@ -63,8 +83,22 @@ export const todosApi = {
 };
 
 export const postsApi = {
-  list() {
-    return apiFetch("/posts");
+  async getPage(page) {
+    const payload = await apiAxiosGet(`/posts${buildQuery({ _page: page })}`);
+
+    return {
+      items: payload.data,
+      totalCount: payload.totalCount
+    };
+  },
+
+  async getPageByUser(userId, page) {
+    const payload = await apiAxiosGet(`/posts${buildQuery({ userId, _page: page })}`);
+
+    return {
+      items: payload.data,
+      totalCount: payload.totalCount
+    };
   },
   
   async create(post) {
@@ -92,9 +126,39 @@ export const postsApi = {
   }
 };
 
+export const adminApi = {
+  listUsers() {
+    return apiFetch("/admin/users");
+  },
+
+  setUserBlocked(id, blocked) {
+    clearResourceCache("users");
+    return apiFetch(`/admin/users/${id}/block`, {
+      method: "PATCH",
+      body: jsonBody({ blocked })
+    });
+  },
+
+  promoteUserToAdmin(id) {
+    clearResourceCache("users");
+    return apiFetch(`/admin/users/${id}/admin`, {
+      method: "PATCH"
+    });
+  },
+
+  listAuditLogs() {
+    return apiFetch("/admin/audit-logs");
+  }
+};
+
 export const commentsApi = {
-  listByPost(postId) {
-    return apiFetch(`/comments${buildQuery({ postId })}`);
+  async getPageByPost(postId, page) {
+    const payload = await apiAxiosGet(`/comments${buildQuery({ postId, _page: page })}`);
+
+    return {
+      items: payload.data,
+      totalCount: payload.totalCount
+    };
   },
 
   async create(comment) {
@@ -122,8 +186,13 @@ export const commentsApi = {
 };
 
 export const albumsApi = {
-  listByUser(userId) {
-    return apiFetch(`/albums${buildQuery({ userId })}`);
+  async getPageByUser(userId, page) {
+    const payload = await apiAxiosGet(`/albums${buildQuery({ userId, _page: page })}`);
+
+    return {
+      items: payload.data,
+      totalCount: payload.totalCount
+    };
   },
 
   async create(album) {
@@ -152,10 +221,8 @@ export const albumsApi = {
 };
 
 export const photosApi = {
-  async getPage(albumId, page, limit) {
-    const payload = await apiAxiosGet(
-      `/photos${buildQuery({ albumId, _page: page, _limit: limit })}`
-    );
+  async getPage(albumId, page) {
+    const payload = await apiAxiosGet(`/photos${buildQuery({ albumId, _page: page })}`);
 
     return {
       items: payload.data,

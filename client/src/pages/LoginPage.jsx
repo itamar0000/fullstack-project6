@@ -22,15 +22,15 @@ function LoginPage() {
   });
 
   if (currentUser) {
-    return <Navigate to={appRoutes.home} replace />;
+    return <Navigate to={appRoutes.userHome(currentUser.id)} replace />;
   }
 
   async function onSubmit(values) {
     setError("");
 
     try {
-      await login(values.username, values.password);
-      navigate(location.state?.from || appRoutes.home, { replace: true });
+      const user = await login(values.username, values.password);
+      navigate(location.state?.from || appRoutes.userHome(user.id), { replace: true });
     } catch (err) {
       setError(err.message);
     }

@@ -1,6 +1,8 @@
 import { Router } from "express";
 import pool from "../db.js";
+import { logAction } from "../audit.js";
 import { requireAuth } from "../middleware/auth.js";
+import { getPagination, setTotalCountHeader } from "../pagination.js";
 
 const router = Router();
 
@@ -9,10 +11,10 @@ async function getOwningAlbum(albumId) {
   return album || null;
 }
 
-// GET /photos?albumId=X&_page=N&_limit=M
+// GET /photos?albumId=X&_page=N
 // Returns X-Total-Count header for pagination (matches json-server / axios client behaviour)
 router.get("/", async (req, res) => {
-  const { albumId, _page, _limit } = req.query;
+  const { albumId } = req.query;
 
   let countSql = "SELECT COUNT(*) AS total FROM photos";
   let dataSql  = "SELECT * FROM photos";
@@ -27,19 +29,11 @@ router.get("/", async (req, res) => {
   dataSql += " ORDER BY id";
 
   const [[{ total }]] = await pool.execute(countSql, params);
-  res.setHeader("X-Total-Count", total);
-  res.setHeader("Access-Control-Expose-Headers", "X-Total-Count");
+  setTotalCountHeader(res, total);
 
-  if (_page && _limit) {
-    const page   = Math.max(1, parseInt(_page,  10));
-    const limit  = Math.max(1, parseInt(_limit, 10));
-    const offset = (page - 1) * limit;
-    // mysql2 prepared statements require integer type for LIMIT/OFFSET
-    dataSql += ` LIMIT ${limit} OFFSET ${offset}`;
-    const [rows] = await pool.execute(dataSql, params);
-    return res.json(rows);
-  }
-
+  const { limit, offset } = getPagination(req.query, 6);
+  // mysql2 prepared statements require integer type for LIMIT/OFFSET.
+  dataSql += ` LIMIT ${limit} OFFSET ${offset}`;
   const [rows] = await pool.execute(dataSql, params);
   res.json(rows);
 });
@@ -66,6 +60,7 @@ router.post("/", requireAuth, async (req, res) => {
     [albumId, title, url, thumbnailUrl]
   );
   const [[row]] = await pool.execute("SELECT * FROM photos WHERE id = ?", [result.insertId]);
+  await logAction(req.userId, "CREATE_PHOTO", "photos", row.id, { albumId });
   res.status(201).json(row);
 });
 
@@ -91,6 +86,7 @@ async function handleUpdate(req, res) {
     [title, url, thumbnailUrl, req.params.id]
   );
   const [[row]] = await pool.execute("SELECT * FROM photos WHERE id = ?", [req.params.id]);
+  await logAction(req.userId, "UPDATE_PHOTO", "photos", row.id);
   res.json(row);
 }
 
@@ -104,6 +100,7 @@ router.delete("/:id", requireAuth, async (req, res) => {
     return res.status(403).json({ message: "You can only delete photos in your own albums" });
   }
 
+  await logAction(req.userId, "DELETE_PHOTO", "photos", Number(req.params.id));
   await pool.execute("DELETE FROM photos WHERE id = ?", [req.params.id]);
   res.json({});
 });

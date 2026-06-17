@@ -5,6 +5,8 @@ import { dbConfig } from "./config.js";
 // Connect without selecting a database so we can create it if missing.
 const { database, ...serverConfig } = dbConfig;
 
+// The root connection is used for one-time setup work: create the database,
+// select it, create any missing tables, run migrations, and seed initial rows.
 const ROOT = await mysql.createConnection({
   ...serverConfig,
   multipleStatements: true,
@@ -13,6 +15,18 @@ const ROOT = await mysql.createConnection({
 await ROOT.execute(`CREATE DATABASE IF NOT EXISTS \`${database}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`);
 await ROOT.query(`USE \`${database}\``);
 
+async function columnExists(tableName, columnName) {
+  const [[row]] = await ROOT.execute(
+    `SELECT COUNT(*) AS cnt
+     FROM INFORMATION_SCHEMA.COLUMNS
+     WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ?`,
+    [database, tableName, columnName]
+  );
+  return Number(row.cnt) > 0;
+}
+
+// Core user profile data. Passwords are deliberately stored in user_passwords
+// instead of this table so public user responses never expose password hashes.
 await ROOT.execute(`
   CREATE TABLE IF NOT EXISTS users (
     id           INT AUTO_INCREMENT PRIMARY KEY,
@@ -27,10 +41,21 @@ await ROOT.execute(`
     zipcode      VARCHAR(50),
     company_name VARCHAR(255),
     company_catchphrase TEXT,
-    company_bs   TEXT
+    company_bs   TEXT,
+    is_admin     TINYINT(1) DEFAULT 0,
+    is_blocked   TINYINT(1) DEFAULT 0
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
 `);
 
+if (!(await columnExists("users", "is_admin"))) {
+  await ROOT.execute("ALTER TABLE users ADD COLUMN is_admin TINYINT(1) DEFAULT 0");
+}
+
+if (!(await columnExists("users", "is_blocked"))) {
+  await ROOT.execute("ALTER TABLE users ADD COLUMN is_blocked TINYINT(1) DEFAULT 0");
+}
+
+// Authentication data is split from users and cascades away with the user row.
 await ROOT.execute(`
   CREATE TABLE IF NOT EXISTS user_passwords (
     user_id  INT PRIMARY KEY,
@@ -39,6 +64,8 @@ await ROOT.execute(`
   ) ENGINE=InnoDB
 `);
 
+// App content tables mirror the JSONPlaceholder-style resources used by the UI.
+// Foreign keys keep child records tied to their owning user/post/album.
 await ROOT.execute(`
   CREATE TABLE IF NOT EXISTS todos (
     id        INT AUTO_INCREMENT PRIMARY KEY,
@@ -59,6 +86,8 @@ await ROOT.execute(`
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
 `);
 
+// Comments optionally point at a user; deleting a user keeps the comment but
+// clears that relationship so post discussions are not removed unexpectedly.
 await ROOT.execute(`
   CREATE TABLE IF NOT EXISTS comments (
     id     INT AUTO_INCREMENT PRIMARY KEY,
@@ -87,6 +116,33 @@ if (!hasUserIdCol) {
 }
 
 await ROOT.execute(`
+  UPDATE comments c
+  JOIN users u ON c.email = u.email AND c.name = u.name
+  SET c.userId = u.id
+  WHERE c.userId IS NULL
+`);
+
+await ROOT.execute(`
+  UPDATE comments c
+  JOIN posts p ON c.postId = p.id
+  SET c.userId = p.userId
+  WHERE c.userId IS NULL
+`);
+
+await ROOT.execute(`
+  CREATE TABLE IF NOT EXISTS audit_logs (
+    id         INT AUTO_INCREMENT PRIMARY KEY,
+    actorId    INT NULL,
+    action     VARCHAR(80) NOT NULL,
+    targetType VARCHAR(80) NOT NULL,
+    targetId   INT NULL,
+    details    TEXT,
+    createdAt  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (actorId) REFERENCES users(id) ON DELETE SET NULL
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+`);
+
+await ROOT.execute(`
   CREATE TABLE IF NOT EXISTS albums (
     id     INT AUTO_INCREMENT PRIMARY KEY,
     userId INT NOT NULL,
@@ -107,6 +163,8 @@ await ROOT.execute(`
 `);
 
 // ── Seed data (skip if already populated) ────────────────────────────────────
+// A non-empty users table means this database was already initialized. This
+// keeps repeated npm/server starts from duplicating demo data.
 const [[{ cnt }]] = await ROOT.execute("SELECT COUNT(*) AS cnt FROM users");
 if (Number(cnt) === 0) {
   console.log("Seeding database...");
@@ -200,6 +258,8 @@ if (Number(cnt) === 0) {
   }
 
   const photos = [];
+  // Generate predictable placeholder photo rows instead of storing a long
+  // static fixture list in this script.
   for (let i = 1; i <= 50; i++) {
     const albumId = i <= 7 ? 1 : i <= 12 ? 2 : i <= 17 ? 3 : i <= 22 ? 4 : i <= 27 ? 5 : i <= 32 ? 6 : 7;
     photos.push([i, albumId,
@@ -223,6 +283,7 @@ const [plaintextPasswords] = await ROOT.execute(
   "SELECT user_id, password FROM user_passwords WHERE password NOT LIKE '$2%'"
 );
 for (const row of plaintextPasswords) {
+  // bcrypt hashes start with $2*. Anything else here is legacy plaintext.
   const hash = await bcrypt.hash(row.password, 10);
   await ROOT.execute("UPDATE user_passwords SET password = ? WHERE user_id = ?", [hash, row.user_id]);
 }
@@ -230,9 +291,25 @@ if (plaintextPasswords.length) {
   console.log(`Migrated ${plaintextPasswords.length} plaintext password(s) to bcrypt hashes.`);
 }
 
+// Some old seed data used users.website as a temporary password slot. Clear it
+// after hashes exist so GET /users only returns profile data.
 const [websiteScrub] = await ROOT.execute("UPDATE users SET website = '' WHERE website <> ''");
 if (websiteScrub.affectedRows) {
   console.log(`Cleared leaked password value out of website field for ${websiteScrub.affectedRows} user(s).`);
+}
+
+const [[adminUser]] = await ROOT.execute("SELECT id FROM users WHERE username = ?", ["admin"]);
+if (!adminUser) {
+  const [result] = await ROOT.execute(
+    `INSERT INTO users (name,username,email,phone,website,street,suite,city,zipcode,company_name,company_catchphrase,company_bs,is_admin,is_blocked)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+    ["System Admin", "admin", "admin@example.com", "", "", "", "", "", "", "Project 6", "", "", 1, 0]
+  );
+  const hash = await bcrypt.hash("admin123", 10);
+  await ROOT.execute("INSERT INTO user_passwords (user_id, password) VALUES (?,?)", [result.insertId, hash]);
+  console.log("Created admin account (username: admin, password: admin123).");
+} else {
+  await ROOT.execute("UPDATE users SET is_admin = 1, is_blocked = 0 WHERE id = ?", [adminUser.id]);
 }
 
 await ROOT.end();

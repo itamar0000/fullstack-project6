@@ -1,6 +1,7 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
 import pool from "../db.js";
+import { logAction } from "../audit.js";
 import { requireAuth } from "../middleware/auth.js";
 import { rowToUser } from "../userMapper.js";
 
@@ -55,6 +56,7 @@ router.post("/", async (req, res) => {
     "INSERT INTO user_passwords (user_id, password) VALUES (?,?)",
     [newId, hash]
   );
+  await logAction(newId, "REGISTER_USER", "users", newId, { username });
 
   const [[newUser]] = await pool.execute("SELECT * FROM users WHERE id = ?", [newId]);
   res.status(201).json(rowToUser(newUser));
@@ -97,14 +99,44 @@ async function handleUpdate(req, res) {
   );
 
   const [[updated]] = await pool.execute("SELECT * FROM users WHERE id = ?", [id]);
+  await logAction(req.userId, "UPDATE_PROFILE", "users", Number(id), { username: updated.username });
   res.json(rowToUser(updated));
 }
+
+// PATCH /users/:id/password  (only the authenticated user may change their password)
+router.patch("/:id/password", requireAuth, async (req, res) => {
+  const id = req.params.id;
+  if (Number(id) !== req.userId) {
+    return res.status(403).json({ message: "You can only change your own password" });
+  }
+
+  const { currentPassword, newPassword } = req.body;
+  if (!currentPassword || !newPassword) {
+    return res.status(400).json({ message: "Current password and new password are required" });
+  }
+
+  const [[record]] = await pool.execute(
+    "SELECT password FROM user_passwords WHERE user_id = ?",
+    [id]
+  );
+  if (!record) return res.status(404).json({ message: "Password record not found" });
+
+  const matches = await bcrypt.compare(currentPassword, record.password);
+  if (!matches) return res.status(401).json({ message: "Current password is incorrect" });
+
+  const hash = await bcrypt.hash(newPassword, 10);
+  await pool.execute("UPDATE user_passwords SET password = ? WHERE user_id = ?", [hash, id]);
+  await logAction(req.userId, "CHANGE_PASSWORD", "users", Number(id));
+
+  res.json({ message: "Password changed" });
+});
 
 // DELETE /users/:id  (only the authenticated user may delete their own account)
 router.delete("/:id", requireAuth, async (req, res) => {
   if (Number(req.params.id) !== req.userId) {
     return res.status(403).json({ message: "You can only delete your own account" });
   }
+  await logAction(req.userId, "DELETE_USER", "users", Number(req.params.id));
   await pool.execute("DELETE FROM users WHERE id = ?", [req.params.id]);
   res.json({});
 });

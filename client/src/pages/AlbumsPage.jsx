@@ -48,6 +48,20 @@ function AlbumsPage() {
             onDelete={albumsState.deleteAlbum}
             onRename={albumsState.renameAlbum}
           />
+
+          <p className="pagination-status">
+            Loaded {albumsState.albums.length} of {albumsState.totalCount} albums
+          </p>
+          {albumsState.hasMore && (
+            <button
+              type="button"
+              className="secondary-button load-more"
+              disabled={albumsState.loadingMore}
+              onClick={albumsState.loadMore}
+            >
+              {albumsState.loadingMore ? "Loading..." : "Load more"}
+            </button>
+          )}
         </section>
 
         <section className="plain-panel">

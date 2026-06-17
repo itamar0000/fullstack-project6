@@ -6,6 +6,8 @@ export function rowToUser(r) {
     email: r.email,
     phone: r.phone,
     website: r.website,
+    isAdmin: !!r.is_admin,
+    isBlocked: !!r.is_blocked,
     address: {
       street: r.street,
       suite: r.suite,

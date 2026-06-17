@@ -1,4 +1,4 @@
-import { use, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { postsApi } from "../../api/resources.js";
 
 function assertPostOwner(post, userId) {
@@ -10,7 +10,10 @@ function assertPostOwner(post, userId) {
 export function usePosts(userId) {
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState("");
+  const [page, setPage] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
 
   useEffect(() => {
     let active = true;
@@ -20,9 +23,11 @@ export function usePosts(userId) {
       setError("");
 
       try {
-        const data = await postsApi.list();
+        const payload = await postsApi.getPage(1);
         if (active) {
-          setPosts(data);
+          setPosts(payload.items);
+          setTotalCount(payload.totalCount);
+          setPage(1);
         }
       } catch (err) {
         if (active) {
@@ -41,6 +46,27 @@ export function usePosts(userId) {
     };
   }, [userId]);
 
+  async function loadMore() {
+    if (loadingMore || posts.length >= totalCount) {
+      return;
+    }
+
+    setLoadingMore(true);
+    setError("");
+
+    try {
+      const nextPage = page + 1;
+      const payload = await postsApi.getPage(nextPage);
+      setPosts((items) => [...items, ...payload.items]);
+      setTotalCount(payload.totalCount);
+      setPage(nextPage);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoadingMore(false);
+    }
+  }
+
   async function createPost(title, body) {
     setError("");
 
@@ -51,6 +77,7 @@ export function usePosts(userId) {
         body
       });
       setPosts((items) => [...items, created]);
+      setTotalCount((count) => count + 1);
       return created;
     } catch (err) {
       setError(err.message);
@@ -79,6 +106,7 @@ export function usePosts(userId) {
       assertPostOwner(post, userId);
       await postsApi.remove(post.id);
       setPosts((items) => items.filter((item) => item.id !== post.id));
+      setTotalCount((count) => Math.max(0, count - 1));
       return true;
     } catch (err) {
       setError(err.message);
@@ -89,9 +117,13 @@ export function usePosts(userId) {
   return {
     posts,
     loading,
+    loadingMore,
     error,
+    hasMore: posts.length < totalCount,
+    totalCount,
     createPost,
     updatePost,
-    deletePost
+    deletePost,
+    loadMore
   };
 }

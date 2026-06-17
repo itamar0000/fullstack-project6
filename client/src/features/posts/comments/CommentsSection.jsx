@@ -11,7 +11,7 @@ function CommentsSection({ commentsState, currentUser }) {
         <p className="eyebrow">Comments</p>
         <h3>
           <IconComment className="icon" />
-          {commentsState.comments.length} comments
+          {commentsState.totalCount} comments
         </h3>
       </div>
 
@@ -30,6 +30,20 @@ function CommentsSection({ commentsState, currentUser }) {
           />
         ))}
       </div>
+
+      <p className="pagination-status">
+        Loaded {commentsState.comments.length} of {commentsState.totalCount} comments
+      </p>
+      {commentsState.hasMore && (
+        <button
+          type="button"
+          className="secondary-button load-more"
+          disabled={commentsState.loadingMore}
+          onClick={commentsState.loadMore}
+        >
+          {commentsState.loadingMore ? "Loading..." : "Load more"}
+        </button>
+      )}
     </section>
   );
 }
