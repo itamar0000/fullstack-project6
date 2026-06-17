@@ -1,15 +1,15 @@
 import { Router } from "express";
-import pool from "../db.js";
-import { logAction } from "../audit.js";
 import { requireAdmin, requireAuth } from "../middleware/auth.js";
-import { rowToUser } from "../userMapper.js";
+import { rowToUser } from "../utils/userMapper.js";
+import * as userRepo from "../repositories/userRepository.js";
+import * as auditRepo from "../repositories/auditRepository.js";
 
 const router = Router();
 
 router.use(requireAuth, requireAdmin);
 
 router.get("/users", async (_req, res) => {
-  const [rows] = await pool.execute("SELECT * FROM users ORDER BY id");
+  const rows = await userRepo.findAll();
   res.json(rows.map(rowToUser));
 });
 
@@ -21,45 +21,36 @@ router.patch("/users/:id/block", async (req, res) => {
     return res.status(400).json({ message: "Admins cannot block their own account" });
   }
 
-  const [[target]] = await pool.execute("SELECT * FROM users WHERE id = ?", [targetId]);
+  const target = await userRepo.findById(targetId);
   if (!target) return res.status(404).json({ message: "User not found" });
   if (target.is_admin) return res.status(400).json({ message: "Admin accounts cannot be blocked" });
 
-  await pool.execute("UPDATE users SET is_blocked = ? WHERE id = ?", [blocked ? 1 : 0, targetId]);
-  await logAction(req.userId, blocked ? "BLOCK_USER" : "UNBLOCK_USER", "users", targetId);
+  const updated = await userRepo.setBlocked(targetId, blocked);
+  await auditRepo.logAction(req.userId, blocked ? "BLOCK_USER" : "UNBLOCK_USER", "users", targetId);
 
-  const [[updated]] = await pool.execute("SELECT * FROM users WHERE id = ?", [targetId]);
   res.json(rowToUser(updated));
 });
 
 router.patch("/users/:id/admin", async (req, res) => {
   const targetId = Number(req.params.id);
 
-  const [[target]] = await pool.execute("SELECT * FROM users WHERE id = ?", [targetId]);
+  const target = await userRepo.findById(targetId);
   if (!target) return res.status(404).json({ message: "User not found" });
   if (target.is_blocked) {
     return res.status(400).json({ message: "Blocked users cannot be promoted to admin" });
   }
 
   if (!target.is_admin) {
-    await pool.execute("UPDATE users SET is_admin = 1 WHERE id = ?", [targetId]);
-    await logAction(req.userId, "PROMOTE_ADMIN", "users", targetId);
+    await userRepo.setAdmin(targetId, true);
+    await auditRepo.logAction(req.userId, "PROMOTE_ADMIN", "users", targetId);
   }
 
-  const [[updated]] = await pool.execute("SELECT * FROM users WHERE id = ?", [targetId]);
+  const updated = await userRepo.findById(targetId);
   res.json(rowToUser(updated));
 });
 
 router.get("/audit-logs", async (_req, res) => {
-  const [rows] = await pool.execute(
-    `SELECT l.id, l.actorId, u.username AS actorUsername, l.action, l.targetType,
-            l.targetId, l.details, l.createdAt
-     FROM audit_logs l
-     LEFT JOIN users u ON l.actorId = u.id
-     ORDER BY l.id DESC
-     LIMIT 100`
-  );
-
+  const rows = await auditRepo.listRecent(100);
   res.json(rows.map((row) => ({
     ...row,
     details: row.details ? JSON.parse(row.details) : null

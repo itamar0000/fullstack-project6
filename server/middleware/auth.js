@@ -1,6 +1,6 @@
 import jwt from "jsonwebtoken";
 import { JWT_SECRET } from "../config.js";
-import pool from "../db.js";
+import pool from "../db/pool.js";
 
 export function signToken(user) {
   return jwt.sign(

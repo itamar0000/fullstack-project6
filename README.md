@@ -121,10 +121,18 @@ fullstack-project6/
 │       └── features/       # todos / posts / comments / albums / photos
 ├── server/                 # Express + MySQL back-end
 │   ├── config.js           # DB connection config (env-overridable)
-│   ├── db.js               # MySQL connection pool
-│   ├── init-db.js          # Schema creation + seed data
-│   ├── server.js           # Express app + route mounting
-│   └── routes/             # One router per resource
+│   ├── server.js           # Process entry point (app.listen)
+│   ├── app.js              # Express app: middleware + route mounting
+│   ├── db/                 # DB connection + one-time setup
+│   │   ├── pool.js         # MySQL connection pool
+│   │   ├── init.js         # `npm run init-db` entry: schema → seed → migrations
+│   │   ├── schema.js       # CREATE TABLE definitions
+│   │   ├── seed.js         # Demo data (fresh database only)
+│   │   └── migrations.js   # Legacy-data fixups + ensure-admin
+│   ├── middleware/         # Auth (JWT verify, admin guard)
+│   ├── repositories/       # All SQL — one module per table
+│   ├── routes/             # One HTTP router per resource
+│   └── utils/              # Pagination helpers + user row→DTO mapper
 └── start.ps1               # Windows helper: starts MySQL + the server
 ```
 
